@@ -1,0 +1,181 @@
+Q1
+with table_1 as (
+	select cust, min(quant) as min_quant,max(quant) as max_quant,avg(quant) as avg_quant
+	from sales 
+	group by cust
+),
+table_2 as (
+	select table_1.cust, table_1.min_quant, S.prod as min_prod, S.month as min_month, S.day as min_day, S.year as min_year,
+     S.state as min_state, table_1.max_quant, table_1.avg_quant
+	from table_1, sales as S
+	where table_1.cust = S.cust
+	and table_1.min_quant = S.quant
+),
+table_3 as (
+	select table_2.cust, table_2.min_quant, table_2.min_prod, table_2.min_month, table_2.min_day, table_2.min_year,
+     table_2.min_state, table_2.max_quant, S.prod as max_prod, S.month as max_month, S.day as max_day, S.year as max_year,
+     S.state as max_state, table_2.avg_quant
+	from table_2, sales as S
+	where table_2.cust = S.cust
+	and table_2.max_quant = S.quant
+)
+select *
+from table_3
+
+Q2
+with Jan_min as(
+	select cust, prod, min(quant) as jan_min
+	from sales 
+	where month = 1
+	group by cust, prod 
+),
+Jan_table as(
+	select J.cust, J.prod, J.jan_min, S.month, S.day, S.year
+	from Jan_min as J, sales as S
+	where J.cust = S.cust
+	and J.prod = S.prod
+	and J.jan_min = S.quant
+),
+Feb_max as(
+	select cust, prod, max(quant) as feb_max
+	from sales
+	where month = 2
+	group by cust, prod
+),
+Feb_table as(
+	select F.cust, F.prod, F.feb_max, S.month, S.day, S.year
+	from Feb_max as F, sales as S
+	where F.cust = S.cust
+	and F.prod = S.prod
+	and F.feb_max = S.quant
+),
+Mar_max as(
+	select cust, prod, max(quant) as mar_max
+	from sales 
+	where month = 3
+	group by cust, prod
+),
+Mar_table as (
+	select Ma.cust, Ma.prod, Ma.mar_max, S.month, S.day, S.year
+	from Mar_max as Ma, sales as S
+	where Ma.cust = S.cust
+	and Ma.prod = S.prod
+	and Ma.mar_max = S.quant
+)
+select *
+from Jan_table
+full outer join Feb_table on Jan_table.cust = Feb_table.cust
+and Jan_table.prod = Feb_table.prod
+full outer join Mar_table on Jan_table.cust = Mar_table.cust
+and Jan_table.prod = Mar_table.prod	
+
+Q3
+with base as(
+	select month, prod, sum(quant) as total_q
+	from sales
+	group by month,prod
+),
+max_min as(
+	select month, max(total_q) as max_q, min(total_q) as min_q
+	from base
+	group by month
+),
+max_prod as(
+	select mm.month, b.prod, mm.max_q, mm.min_q
+	from max_min as mm, base as b
+	where mm.month = b.month
+	and mm.max_q = b.total_q
+),
+min_prod as(
+	select mp.month, mp.prod, mp.max_q, b.prod, mp.min_q
+	from max_prod as mp, base as b
+	where mp.month = b.month
+	and mp.min_q = b.total_q
+)
+select *
+from min_prod
+
+Q4
+with base as(
+	select prod, month, sum(quant) as total_q
+	from sales
+	group by prod, month
+),
+max_min as (
+	select prod, max(total_q) as max_q, min(total_q) as min_q
+	from base
+	group by prod
+),
+max_month as(
+	select mm.prod, b.month, mm.max_q, mm.min_q
+	from max_min as mm, base as b
+	where mm.prod = b.prod
+	and mm.max_q = b.total_q
+),
+min_month as(
+	select mt.prod, mt.month, mt.max_q, b.month, mt.min_q
+	from max_month as mt, base as b
+	where mt.prod = b.prod
+	and mt.min_q = b.total_q
+)
+select *
+from min_month
+
+Q5
+with ct_table as(
+	select cust, prod, avg(quant) as ct_avg
+	from sales 
+	where state = 'CT'
+	group by cust, prod 
+),
+nj_table as(
+	select cust, prod, avg(quant) as nj_avg
+	from sales 
+	where state = 'NJ'
+	group by cust, prod
+),
+ny_table as(
+	select cust, prod, avg(quant) as ny_avg
+	from sales 
+	where state = 'NY'
+	group by cust, prod
+),
+pa_table as (
+	select cust, prod, avg(quant) as pa_avg
+	from sales 
+	where state = 'PA'
+	group by cust, prod
+),
+base_table as (
+	select cust, prod
+	from sales
+	group by cust, prod
+),
+total_table as (
+	select base_table.cust, base_table.prod, ct_avg, nj_avg, ny_avg, pa_avg
+	from base_table
+	full outer join ct_table on base_table.cust = ct_table.cust
+	and base_table.prod = ct_table.prod
+	full outer join nj_table on base_table.cust = nj_table.cust
+	and base_table.prod = nj_table.prod
+	full outer join ny_table on base_table.cust = ny_table.cust
+	and base_table.prod = ny_table.prod
+	full outer join pa_table on base_table.cust = pa_table.cust
+	and base_table.prod = pa_table.prod
+),
+avg_sum_count as (
+	select cust, prod, avg(quant) as average, sum(quant) as total, count(*)
+	from sales
+	group by cust, prod
+)
+
+select t.cust, t.prod, t.ct_avg, t.nj_avg, t.ny_avg, t.pa_avg, a.average, a.total, a.count
+from total_table as t, avg_sum_count as a
+where t.cust = a.cust
+and t.prod = a.prod
+	 
+
+
+	
+
+
