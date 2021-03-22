@@ -1,0 +1,177 @@
+Question1
+
+with t1 as (
+ select cust, prod, state, month, avg(quant) as the_avg
+ from sales
+ group by cust, prod, state,month
+ order by cust, prod, state,month
+ ),
+ t2 as (
+ select a.cust, a.prod, a.state, a.month, b.month as other_mon, b.quant 
+ from sales as a, sales as b
+ where a.cust = b.cust
+ and a.prod = b.prod
+ and a.state=b.state
+ and a.month <> b.month
+ group by a.cust, a.prod, a.state, a.month, b.month, b.quant
+ order by a.cust, a.prod, a.state, a.month, b.month, b.quant
+ ),
+ other_mon as (
+ select cust, prod, state, month, avg(quant) as other_mo_avg
+ from t2
+ group by cust, prod, state, month
+ order by cust, prod, state, month
+ ),
+ t3 as (
+ select c.cust, c.prod, c.month, c.state, d.state as other_state, d.quant 
+ from sales as c, sales as d
+ where c.cust = d.cust
+ and c.prod = d.prod
+ and c.month=d.month
+ and c.state <> d.state
+ group by c.cust, c.prod, c.month, c.state, d.state, d.quant
+ order by c.cust, c.prod, c.month, c.state, d.state, d.quant
+ ),
+ other_state as (
+ select cust, prod, state, month, avg(quant) as other_state_avg
+ from t3
+ group by cust, prod, state, month
+ order by cust, prod, state, month
+ ),
+t4 as (
+ select e.cust, e.state, e.month, e.prod, f.prod as other_prod, f.quant 
+ from sales as e, sales as f
+ where e.cust = f.cust
+ and e.state = f.state
+ and e.month=f.month
+ and e.prod <> f.prod
+ group by e.cust, e.state, e.month, e.prod, f.prod, f.quant
+ order by e.cust, e.state, e.month, e.prod, f.prod, f.quant
+ ),
+ other_prod as (
+ select cust, prod, state, month, avg(quant) as other_prod_avg
+ from t4
+ group by cust, prod, state, month
+ order by cust, prod, state, month
+ )
+
+select t1.cust, t1.prod, t1.month, t1.state, t1.the_avg, other_mon.other_mo_avg, other_state.other_state_avg, other_prod.other_prod_avg
+from t1
+full outer join other_mon on t1.cust = other_mon.cust
+and t1.prod = other_mon.prod
+and t1.month = other_mon.month
+and t1.state = other_mon.state
+full outer join other_state on t1.cust = other_state.cust
+and t1.prod = other_state.prod
+and t1.month = other_state.month
+and t1.state = other_state.state
+full outer join other_prod on t1.cust = other_prod.cust
+and t1.prod = other_prod.prod
+and t1.month = other_prod.month
+and t1.state = other_prod.state
+
+Question2
+
+with t1 as(
+select distinct s.prod, s.cust, s.state, s.month,s.quant,
+	case when s.month in (1,2,3) then 1
+	when s.month in (4,5,6) then 2
+	when s.month in (7,8,9) then 3
+	when s.month in (10,11,12) then 4
+	end Quarter
+from sales s
+group by s.prod, s.cust, s.state
+order by s.prod, s.cust, s.state
+),
+t2 as(
+select t1.prod, t1.cust, t1.state, t1.quarter as Q,a.quarter as Before_Q, a.quant
+from t1, t1 as a
+where t1.prod = a.prod
+and t1.cust = a.cust
+and t1.state = a.state
+and a.quarter = t1.quarter - 1	
+group by t1.prod, t1.cust, t1.state, t1.quarter, a.quarter, a.quant
+order by t1.prod, t1.cust, t1.state, t1.quarter, a.quarter, a.quant
+),
+before as (
+select t2.prod,t2.cust,t2.state, t2.Q, avg(quant)as before_avg
+from t2
+group by t2.prod, t2.cust, t2.state, t2.Q
+),
+t3 as (
+select t1.prod, t1.cust, t1.state, t1.quarter as Q, b.quarter as after_Q, b.quant
+from t1, t1 as b
+where t1.prod = b.prod
+and t1.cust = b.cust
+and t1.state = b.state
+and b.quarter = t1.quarter + 1	
+group by t1.prod, t1.cust, t1.state, t1.quarter, b.quarter, b.quant
+order by t1.prod, t1.cust, t1.state, t1.quarter, b.quarter, b.quant
+),
+after as (
+select prod,cust,state, Q, avg(quant)as after_avg
+from t3
+group by prod, cust, state, Q
+)
+
+select t1.cust, t1.prod, t1.state, t1.Quarter, before_avg, after_avg
+from t1
+full outer join before on t1.prod = before.prod
+and t1.cust = before.cust
+and t1.state = before.state
+and t1.Quarter = before.q
+full outer join after_avg on t1.prod = after.prod
+and t1.cust = after.cust
+and t1.state = after.state
+and t1.Quarter = after.q
+
+Question3
+with rank as
+(
+	select a.prod, a.quant, count(a.quant) rank
+	from sales a, sales b
+	where a.prod = b.prod 
+	and a.quant >= b.quant
+	group by a.prod, a.quant
+	order by a.prod, a.quant
+),
+median as(
+	select prod, max(rank)+1/2 as median_rank
+	from rank
+	group by prod
+)
+select r.prod as product, r.quant as median
+from rank as r, median as m
+where r.rank = m.median_rank
+and r.prod = m.prod
+group by product
+order by product
+
+Question4
+
+with sum75 as
+(
+	select cust, prod, sum(quant)*0.75 as s75
+	from sales
+	group by cust,prod
+),
+month_sum as(
+	select cust, prod, month, sum(quant) as mon_quant
+	from sales
+	group by cust, prod, month
+),
+cumula as(
+	select a.cust, a.prod, a.month, sum(b.mon_quant) as cumula
+	from month_sum as a, month_sum as b
+	where a.cust = b.cust
+	and a.prod = b.prod
+	and a.month >= b.month
+	group by a.cust, a.prod, a.month
+)
+select c.cust customer, c.prod product, min(c.month) as month_75
+from cumula as c, sum75 as t
+where c.prod = t.prod
+and c.cust = t.cust
+and c.cumula >= t.s75
+group by c.cust, c.prod
+order by customer, product
